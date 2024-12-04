@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import mysql.connector
+from mysql.connector import Error
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
@@ -11,13 +12,36 @@ db_config = {
     'host': os.environ.get('DB_HOST', '172.17.0.2'),
     'user': os.environ.get('DB_USER', 'root'),
     'password': os.environ.get('DB_PASSWORD', '02136'),
-    'database': os.environ.get('DB_NAME', 'santhosh')
+    'database': os.environ.get('DB_NAME', 'users')
 }
 
 # Database Connection
 def get_db_connection():
     return mysql.connector.connect(**db_config)
 
+# Automatically create required tables
+def initialize_database():
+    create_users_table = """
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(create_users_table)
+        conn.commit()
+        print("Table 'users' is ensured to exist.")
+    except Error as e:
+        print(f"Error creating table: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# Flask Routes
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -86,5 +110,7 @@ def logout():
     flash("You have been logged out.", "info")
     return redirect(url_for('login'))
 
+# Initialize the database on app start
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    initialize_database()  # Ensure tables are created
+    app.run(debug=False, port=5002)
